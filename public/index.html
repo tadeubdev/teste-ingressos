@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Facul001</title>
+    <!-- update the version number as needed -->
+    <script defer src="/__/firebase/9.10.0/firebase-app-compat.js"></script>
+    <!-- include only the Firebase features as you need -->
+    <script defer src="/__/firebase/9.10.0/firebase-auth-compat.js"></script>
+    <script defer src="/__/firebase/9.10.0/firebase-database-compat.js"></script>
+    <script defer src="/__/firebase/9.10.0/firebase-firestore-compat.js"></script>
+    <script defer src="/__/firebase/9.10.0/firebase-functions-compat.js"></script>
+    <script defer src="/__/firebase/9.10.0/firebase-messaging-compat.js"></script>
+    <script defer src="/__/firebase/9.10.0/firebase-storage-compat.js"></script>
+    <script defer src="/__/firebase/9.10.0/firebase-analytics-compat.js"></script>
+    <script defer src="/__/firebase/9.10.0/firebase-remote-config-compat.js"></script>
+    <script defer src="/__/firebase/9.10.0/firebase-performance-compat.js"></script>
+    <!-- 
+      initialize the SDK after all desired features are loaded, set useEmulator to false
+      to avoid connecting the SDK to running emulators.
+    -->
+    <script defer src="/__/firebase/init.js?useEmulator=true"></script>
+  </head>
+  <body>
+    <div id="load">
+      <h1>Ingressos</h1>
+
+      <form id="form-ingresso">
+        <h5>Selecione a quantidade</h5>
+        <input type="number" name="quantidade" id="quantidade" min="1" max="100" value="1" />
+        <button id="comprar">
+          Comprar Ingressos
+        </button>
+      </form>
+
+      <br> <br> <br>
+
+      <button id="sair-da-minha-conta" style="display:none;">
+        Sair da minha conta
+      </button>
+    </div>
+
+    <script>
+      async function user() {
+        return new Promise((resolve, reject) => {
+          firebase.auth().onAuthStateChanged((user) => {
+            resolve(user || null);
+          });
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', async function() {
+        try {
+          const app = firebase.app();
+          const provider = new firebase.auth.GoogleAuthProvider();
+
+          if (await user()) {
+            document.getElementById('sair-da-minha-conta').style.display = 'block';
+          }
+
+          firebase.auth().getRedirectResult().then((result) => {
+            const quantidadeIngressos = localStorage.getItem('quantidadeIngressos');
+            document.getElementById('quantidade').value = quantidadeIngressos || 1;
+            if (quantidadeIngressos && confirm('Deseja finalizar a compra dos ' + quantidadeIngressos + ' ingressos?')) {
+              document.getElementById('comprar').click();
+            }
+            localStorage.removeItem('quantidadeIngressos');
+          }).catch((error) => {
+            console.error(error)
+          });
+
+          document.querySelector('#form-ingresso').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            let quantidade = document.getElementById('quantidade').value;
+            quantidade = quantidade? parseInt(quantidade) : 0;
+            if (!quantidade) {
+              alert('Informe a quantidade de ingressos');
+              return false;
+            }
+            const loggedUser = await user();
+            if (!loggedUser) {
+              localStorage.setItem('quantidadeIngressos', quantidade);
+              firebase.auth().signInWithRedirect(provider);
+              return false;
+            }
+            app.database().ref('/ingressos').push({
+              nome: loggedUser.displayName,
+              email: loggedUser.email,
+              data: new Date(),
+              quantidade: quantidade,
+              uid: loggedUser.uid
+            }).then(() => {
+              alert('Ingresso comprado com sucesso!');
+            }).catch(() => {
+              alert('Ops! Ocorreu um erro ao comprar o ingresso! Tente novamente mais tarde.');
+            }).finally(() => {
+              document.getElementById('quantidade').value = 0;
+            });
+            return false;
+          });
+
+          document.querySelector('#sair-da-minha-conta').addEventListener('click', async (e) => {
+            e.preventDefault();
+            firebase.auth().signOut().then(() => {
+              alert('Você saiu da sua conta!');
+            }).catch(() => {
+              alert('Ops! Ocorreu um erro ao sair da sua conta! Tente novamente mais tarde.');
+            });
+          });
+        } catch (e) {
+          console.error('- Ops! Algo deu errado!', e? e.message: null, e);
+        }
+      });
+    </script>
+  </body>
+</html>
